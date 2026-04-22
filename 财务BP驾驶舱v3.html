@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>财务BP · 月度经营分析驾驶舱</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap');
+:root{--navy:#0A1F3D;--blue:#1456A8;--sky:#2B8FD8;--teal:#0D9E82;--orange:#E06B20;--amber:#D4A017;--red:#C93B3B;--green:#1A8050;--muted:#7A90A8;--bg:#EEF2F7;--card:#fff;--border:#D0DBE8;--text:#1A2E45;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.header{background:linear-gradient(135deg,var(--navy),#0D2E5E);padding:0 36px;display:flex;align-items:center;justify-content:space-between;height:72px;position:sticky;top:0;z-index:50;box-shadow:0 2px 20px rgba(0,0,0,.35);}
+.hlogo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--sky),var(--teal));display:flex;align-items:center;justify-content:center;font-size:18px;}
+.htitle h1{font-size:16px;font-weight:700;color:#fff;letter-spacing:.5px;}
+.htitle p{font-size:11px;color:#7AAED8;margin-top:2px;letter-spacing:1px;text-transform:uppercase;}
+.hmeta{color:#5A8AB8;font-size:12px;padding:6px 16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:20px;}
+.hmeta span{color:#9DC4E8;font-weight:600;}
+#upload-wrap{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 72px);padding:40px;}
+.ucard{background:var(--card);border-radius:24px;padding:60px 80px;text-align:center;border:2px dashed var(--border);max-width:580px;width:100%;transition:all .3s;box-shadow:0 8px 40px rgba(10,31,61,.08);}
+.ucard:hover{border-color:var(--sky);transform:translateY(-2px);}
+.ucard.drag{border-color:var(--teal);background:#F0FBF8;}
+.uicon{font-size:56px;margin-bottom:20px;display:block;}
+.ucard h2{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:10px;}
+.ucard p{color:var(--muted);font-size:14px;line-height:1.8;margin-bottom:32px;}
+.ubtn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--sky));color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(20,86,168,.35);transition:all .2s;}
+.ubtn:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(20,86,168,.45);}
+.uhint{margin-top:14px;font-size:11px;color:var(--muted);}
+#hbar{display:none;background:var(--navy);padding:10px 36px;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.08);}
+.hlabel{color:#5A8AB8;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
+.chip{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.15);color:#8AB4D8;background:rgba(255,255,255,.06);transition:all .2s;font-family:'DM Mono',monospace;}
+.chip:hover{background:rgba(255,255,255,.12);color:#fff;}
+.chip.on{background:var(--sky);border-color:var(--sky);color:#fff;}
+.xbtn{padding:5px 10px;border-radius:0 20px 20px 0;border:1px solid rgba(201,59,59,.3);cursor:pointer;font-size:12px;background:rgba(201,59,59,.15);color:#E88;margin-left:-4px;transition:all .2s;}
+.xbtn:hover{background:rgba(201,59,59,.4);}
+.addbtn{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1px dashed rgba(255,255,255,.2);color:#5A8AB8;background:transparent;transition:all .2s;}
+.addbtn:hover{border-color:var(--sky);color:var(--sky);}
+#dash{display:none;padding:28px 36px 48px;}
+.krow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.kcard{background:var(--card);border-radius:14px;padding:20px 22px;border:1px solid var(--border);border-top:4px solid var(--blue);position:relative;overflow:hidden;animation:fu .4s ease both;}
+.kcard::after{content:attr(data-icon);position:absolute;right:16px;top:14px;font-size:28px;opacity:.12;}
+.klbl{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;}
+.kval{font-size:28px;font-weight:900;color:var(--navy);line-height:1;margin-bottom:6px;font-family:'DM Mono',monospace;}
+.ksub{font-size:11px;color:var(--muted);}
+.bdg{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px;}
+.bup{background:#E6F7EE;color:var(--green);}
+.bdn{background:#FEF0EF;color:var(--red);}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.g3{display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:20px;}
+.cc{background:var(--card);border-radius:14px;padding:22px 24px;border:1px solid var(--border);animation:fu .5s ease both;}
+.ct{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.ct::before{content:'';display:block;width:4px;height:16px;border-radius:2px;background:var(--sky);flex-shrink:0;}
+.dtbl{width:100%;border-collapse:collapse;font-size:12px;}
+.dtbl th{background:var(--navy);color:#fff;padding:9px 12px;font-weight:700;font-size:11px;text-align:right;}
+.dtbl th:first-child{text-align:left;}
+.dtbl td{padding:8px 12px;text-align:right;border-bottom:1px solid #F0F4F8;}
+.dtbl td:first-child{text-align:left;font-weight:500;}
+.dtbl tr:hover td{background:#F5F8FC;}
+.dtbl tr.tot td{font-weight:800;color:var(--navy);background:#EEF2F7;}
+.pw{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
+.pt{width:56px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0;}
+.pf{height:100%;border-radius:3px;}
+.yg{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.yi{background:#F5F8FC;border-radius:10px;padding:14px 16px;border:1px solid var(--border);}
+.yl{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;}
+.yv{font-size:20px;font-weight:900;color:var(--navy);font-family:'DM Mono',monospace;}
+.yc{font-size:11px;color:var(--muted);margin-top:4px;}
+.footer{margin-top:32px;text-align:center;font-size:11px;color:var(--muted);}
+@keyframes fu{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+.gr{color:var(--green);}.rd{color:var(--red);}.mn{font-family:'DM Mono',monospace;}
+@media(max-width:1100px){.krow{grid-template-columns:repeat(2,1fr);}.g2,.g3{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="hlogo">📊</div>
+    <div class="htitle"><h1>财务BP · 月度经营分析驾驶舱</h1><p>Finance Business Partner · Monthly Dashboard</p></div>
+  </div>
+  <div class="hmeta" id="hmeta">请上传Excel报表以开始分析</div>
+</div>
+<div id="hbar">
+  <span class="hlabel">历史月份</span>
+  <div id="chips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+  <button class="addbtn" onclick="document.getElementById('fh').click()">＋ 上传新月份</button>
+</div>
+<div id="upload-wrap">
+  <div class="ucard" id="dz">
+    <span class="uicon">📂</span>
+    <h2>上传月度填报文件</h2>
+    <p>将填写好的《财务BP月度分析模板.xlsx》上传<br>系统自动读取全部Sheet并渲染驾驶舱<br><strong>数据仅在本机浏览器处理，不上传任何服务器</strong></p>
+    <button class="ubtn" onclick="document.getElementById('fm').click()">📤 选择Excel文件</button>
+    <div class="uhint">支持 .xlsx 格式 · 可多次上传不同月份 · 历史数据保存在本地</div>
+    <input type="file" id="fm" accept=".xlsx,.xls" style="display:none" onchange="go(this.files[0])">
+  </div>
+</div>
+<input type="file" id="fh" accept=".xlsx,.xls" style="display:none" onchange="go(this.files[0])">
+<div id="dash"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// STORAGE
+// ══════════════════════════════════════════════════════
+const SK='fp_v4';
+let ST={months:{},cur:null};
+let EC={};
+function loadST(){try{const s=localStorage.getItem(SK);if(s)ST=JSON.parse(s);}catch(e){}}
+function saveST(){try{localStorage.setItem(SK,JSON.stringify(ST));}catch(e){}}
+
+// ══════════════════════════════════════════════════════
+// CORE PARSER — uses sheet_to_json({header:'A'}) so
+// columns are always named A,B,C... regardless of empty cols
+// ══════════════════════════════════════════════════════
+function parseWB(wb){
+  return {
+    meta:     parseMeta(wb),
+    revenue:  parseRev(wb),
+    expense:  parseExp(wb),
+    cashflow: parseCF(wb),
+  };
+}
+
+// Get sheet rows as array-of-objects keyed by column letter (A,B,C,...)
+// This avoids the SheetJS sparse-array issue entirely
+function getRows(wb, hints){
+  const sname = wb.SheetNames.find(n=>hints.some(h=>n.includes(h)));
+  if(!sname) return [];
+  // Use {header:'A'} so col A is always key 'A', col B always 'B', etc.
+  return XLSX.utils.sheet_to_json(wb.Sheets[sname], {header:'A', defval:null});
+}
+
+function nv(v){ // safe number
+  if(v===null||v===undefined||v==='') return 0;
+  if(typeof v==='number') return v;
+  const x=parseFloat(String(v).replace(/,/g,''));
+  return isNaN(x)?0:x;
+}
+
+function clean(s){ // clean label
+  return String(s||'').replace(/^\s+/,'').replace(/^[一二三四五六七八九十\d]+[、.．]/,'').trim();
+}
+
+function has(s,...kws){ // label contains all keywords
+  const l=clean(s);
+  return kws.every(k=>l.includes(k));
+}
+
+// ── META ──
+function parseMeta(wb){
+  const rows=getRows(wb,['基础','项目','①']);
+  const m={project:'未知项目',period:'',region:'',stage:''};
+  rows.forEach(r=>{
+    const lbl=String(r.B||'').replace(/⚠\s*/,'').trim();
+    const val=String(r.C||'').trim();
+    if(lbl.includes('报告年月'))  m.period  = val;
+    if(lbl.includes('项目名称'))  m.project = val;
+    if(lbl.includes('所属区域'))  m.region  = val;
+    if(lbl.includes('开发阶段'))  m.stage   = val;
+  });
+  if(!m.period) m.period=new Date().toISOString().slice(0,7);
+  return m;
+}
+
+// ── REVENUE ──
+// Template: A=空, B=科目名, C=月预算, D=月实际, E=完成率, F=YTD预算, G=YTD实际, H=YTD完成率, I=全年预算
+function parseRev(wb){
+  const rows=getRows(wb,['收入','②']);
+
+  function pick(rows, ...kws){
+    return rows.filter(r=>has(r.B,...kws));
+  }
+
+  // Sub-items for 结转收入: rows whose label contains 结转 (but not 结转收入 itself, not 结转成本)
+  const revSubs = rows.filter(r=>{
+    const l=clean(r.B);
+    return (l.includes('住宅结转')||l.includes('商业结转')||l.includes('车位结转'));
+  });
+
+  // Sub-items for 结转成本
+  const costSubs = rows.filter(r=>{
+    const l=clean(r.B);
+    return l.includes('土地成本')||l.includes('建安成本')||l.includes('管理费');
+  });
+
+  function sumF(subs,col){ return subs.reduce((s,r)=>s+nv(r[col]),0); }
+
+  const recog={
+    mb:sumF(revSubs,'C'), ma:sumF(revSubs,'D'),
+    yb:sumF(revSubs,'F'), ya:sumF(revSubs,'G'),
+    ann:sumF(revSubs,'I'),
+  };
+  const cost={
+    mb:sumF(costSubs,'C'), ma:sumF(costSubs,'D'),
+    yb:sumF(costSubs,'F'), ya:sumF(costSubs,'G'),
+    ann:sumF(costSubs,'I'),
+  };
+  const gp={
+    mb:recog.mb-cost.mb, ma:recog.ma-cost.ma,
+    yb:recog.yb-cost.yb, ya:recog.ya-cost.ya,
+    ann:recog.ann-cost.ann,
+  };
+
+  // YoY
+  const yoyPY = rows.find(r=>String(r.B||'').includes('上年同期'));
+  const yoyPM = rows.find(r=>String(r.B||'').includes('上月'));
+
+  // Bar chart: all leaf rows with real values
+  const barKws=['住宅认购','商业认购','车位认购','住宅签约','商业签约','住宅结转','商业结转','土地成本','建安成本','管理费'];
+  const barItems=[];
+  rows.forEach(r=>{
+    const l=clean(r.B);
+    if(barKws.some(k=>l.includes(k)) && (nv(r.C)!==0||nv(r.D)!==0)){
+      barItems.push({name:l, mb:nv(r.C), ma:nv(r.D)});
+    }
+  });
+
+  return {recog, cost, gp, barItems,
+    yoy:{prevYear:yoyPY?nv(yoyPY.D):0, prevMonth:yoyPM?nv(yoyPM.D):0}};
+}
+
+// ── EXPENSE ──
+// Template: A=空, B=费用科目, C=月预算, D=月实际, E=完成率, F=YTD预算, G=YTD实际
+function parseExp(wb){
+  const rows=getRows(wb,['费用','③']);
+  const skipKws=['费用执行','费用科目','本月','预算','期间费用合计','开发成本本月'];
+  // Aggregate rows to skip (they're formula sums)
+  const aggKws=['销售费用','管理费用','财务费用'];
+
+  const items=[];
+  rows.forEach(r=>{
+    const l=clean(r.B);
+    if(!l) return;
+    if(skipKws.some(k=>l.includes(k))) return;
+    // skip pure aggregate rows
+    if(aggKws.some(k=>l===k)) return;
+    if(nv(r.C)===0&&nv(r.D)===0) return;
+    items.push({name:l, mb:nv(r.C), ma:nv(r.D), yb:nv(r.F), ya:nv(r.G)});
+  });
+
+  return {
+    items,
+    totalMB:items.reduce((s,r)=>s+r.mb,0),
+    totalMA:items.reduce((s,r)=>s+r.ma,0),
+  };
+}
+
+// ── CASHFLOW ──
+// Template: A=空, B=科目, C=月计划, D=月实际, E=完成率, F=YTD计划, G=YTD实际
+function parseCF(wb){
+  const rows=getRows(wb,['现金','回款','④']);
+  const skipKws=['现金流与回款','科目','计划','完成率','回款合计','支出合计','净现金流','回款率'];
+
+  const items=[];
+  rows.forEach(r=>{
+    const l=clean(r.B);
+    if(!l) return;
+    if(skipKws.some(k=>l.includes(k))) return;
+    if(nv(r.C)===0&&nv(r.D)===0) return;
+    const isMeta=l.includes('期末现金')||l.includes('贷款余额');
+    items.push({name:l, mp:nv(r.C), ma:nv(r.D), yp:nv(r.F), ya:nv(r.G), isMeta});
+  });
+
+  const flowItems=items.filter(r=>!r.isMeta);
+  const cashBal=items.find(r=>r.name.includes('期末现金'));
+  const loanBal=items.find(r=>r.name.includes('贷款余额'));
+
+  return {
+    items: flowItems,
+    inflow:  flowItems.filter(r=>r.name.includes('回款')).reduce((s,r)=>s+r.ma,0),
+    planIn:  flowItems.filter(r=>r.name.includes('回款')).reduce((s,r)=>s+r.mp,0),
+    cashBal: cashBal?nv(cashBal.ma):0,
+    loanBal: loanBal?nv(loanBal.ma):0,
+  };
+}
+
+// ══════════════════════════════════════════════════════
+// FILE HANDLER
+// ══════════════════════════════════════════════════════
+function go(file){
+  if(!file) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'binary'});
+    const d=parseWB(wb);
+    const key=d.meta.period||'未知';
+    ST.months[key]=d; ST.cur=key; saveST(); renderAll();
+  };
+  rd.readAsBinaryString(file);
+  document.getElementById('fm').value='';
+  document.getElementById('fh').value='';
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════
+const F=(v,d=1)=>v==null||isNaN(v)?'—':Number(v).toLocaleString('zh-CN',{maximumFractionDigits:d,minimumFractionDigits:d});
+const P=(a,b)=>b?((a/b)*100).toFixed(1)+'%':'—';
+const D=(a,b)=>b&&b!==0?((a-b)/Math.abs(b)*100).toFixed(1):null;
+const BDG=v=>{if(v==null)return'';const n=parseFloat(v);return`<span class="bdg ${n>=0?'bup':'bdn'}">${n>=0?'▲':'▼'}${Math.abs(n)}%</span>`;};
+
+function renderAll(){
+  const keys=Object.keys(ST.months).sort();
+  if(!keys.length) return;
+  document.getElementById('upload-wrap').style.display='none';
+  document.getElementById('hbar').style.display='flex';
+  document.getElementById('dash').style.display='block';
+
+  // chips
+  const cbox=document.getElementById('chips'); cbox.innerHTML='';
+  keys.forEach(m=>{
+    const w=document.createElement('span'); w.style.cssText='display:inline-flex;align-items:center;';
+    const c=document.createElement('span'); c.className='chip'+(m===ST.cur?' on':''); c.textContent=m;
+    c.onclick=()=>{ST.cur=m;saveST();renderAll();};
+    const x=document.createElement('button'); x.className='xbtn'; x.textContent='×'; x.title='删除';
+    x.onclick=ev=>{ev.stopPropagation();if(confirm(`删除 ${m} 数据？`)){delete ST.months[m];ST.cur=Object.keys(ST.months).sort().pop()||null;saveST();ST.cur?renderAll():location.reload();}};
+    w.appendChild(c);w.appendChild(x);cbox.appendChild(w);
+  });
+
+  const cur=ST.months[ST.cur]; if(!cur) return;
+  const {meta,revenue:rv,expense:ex,cashflow:cf}=cur;
+
+  document.getElementById('hmeta').innerHTML=
+    `<span>${meta.project}</span> · ${meta.period} · ${meta.region||''} ${meta.stage||''}`;
+
+  const curRevMA=rv.recog.ma, curGPMA=rv.gp.ma;
+  const margin=curRevMA?(curGPMA/curRevMA*100).toFixed(1):null;
+  const prevKey=keys[keys.indexOf(ST.cur)-1];
+  const prev=prevKey?ST.months[prevKey]:null;
+  const prevRevMA=prev?prev.revenue.recog.ma:0;
+  const revDiff=prevRevMA?D(curRevMA,prevRevMA):null;
+
+  Object.values(EC).forEach(c=>{try{c.dispose();}catch(e){}});  EC={};
+
+  document.getElementById('dash').innerHTML=`
+    <div class="krow">
+      <div class="kcard" style="border-top-color:var(--blue)" data-icon="💰">
+        <div class="klbl">本月结转收入</div>
+        <div class="kval">${F(curRevMA)}<small style="font-size:14px;font-weight:400;color:var(--muted)"> 万</small></div>
+        <div class="ksub">预算 ${F(rv.recog.mb)} 万 · 完成率 <b>${P(curRevMA,rv.recog.mb)}</b>${revDiff!==null?BDG(revDiff):''}</div>
+      </div>
+      <div class="kcard" style="border-top-color:var(--teal)" data-icon="📈">
+        <div class="klbl">本月毛利润</div>
+        <div class="kval">${F(curGPMA)}<small style="font-size:14px;font-weight:400;color:var(--muted)"> 万</small></div>
+        <div class="ksub">毛利率 <b class="${margin&&parseFloat(margin)>=25?'gr':'rd'}">${margin??'—'}%</b> · 预算完成 ${P(curGPMA,rv.gp.mb)}</div>
+      </div>
+      <div class="kcard" style="border-top-color:var(--orange)" data-icon="💸">
+        <div class="klbl">本月费用合计</div>
+        <div class="kval">${F(ex.totalMA)}<small style="font-size:14px;font-weight:400;color:var(--muted)"> 万</small></div>
+        <div class="ksub">预算 ${F(ex.totalMB)} 万 · 完成率 <b class="${ex.totalMA<=ex.totalMB?'gr':'rd'}">${P(ex.totalMA,ex.totalMB)}</b></div>
+      </div>
+      <div class="kcard" style="border-top-color:var(--amber)" data-icon="🏦">
+        <div class="klbl">本月回款</div>
+        <div class="kval">${F(cf.inflow)}<small style="font-size:14px;font-weight:400;color:var(--muted)"> 万</small></div>
+        <div class="ksub">计划 ${F(cf.planIn)} 万 · 完成率 <b>${P(cf.inflow,cf.planIn)}</b></div>
+      </div>
+    </div>
+
+    <div class="g2">
+      <div class="cc"><div class="ct">收入科目 · 预算 vs 实际（本月，万元）</div><div id="cr" style="height:280px"></div></div>
+      <div class="cc"><div class="ct">毛利率趋势（历史各月）</div><div id="cm" style="height:280px"></div></div>
+    </div>
+    <div class="g2">
+      <div class="cc"><div class="ct">费用执行对比（本月，万元）</div><div id="ce" style="height:280px"></div></div>
+      <div class="cc"><div class="ct">现金流 · 计划 vs 实际（本月，万元）</div><div id="cc2" style="height:280px"></div></div>
+    </div>
+    <div class="g3">
+      <div class="cc">
+        <div class="ct">本年累计(YTD) 完成情况</div>
+        <table class="dtbl" id="ytd"></table>
+      </div>
+      <div class="cc">
+        <div class="ct">同比 / 环比</div>
+        <div class="yg" id="yg"></div>
+        ${cf.cashBal||cf.loanBal?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+          <div class="yi"><div class="yl">期末现金余额</div><div class="yv">${F(cf.cashBal)}<small style="font-size:12px;font-weight:400"> 万</small></div></div>
+          <div class="yi"><div class="yl">贷款余额</div><div class="yv" style="color:var(--red)">${F(cf.loanBal)}<small style="font-size:12px;font-weight:400"> 万</small></div></div>
+        </div>`:''}
+      </div>
+    </div>
+    ${keys.length>1?`<div class="cc" style="margin-bottom:20px"><div class="ct">多月结转收入趋势（万元）</div><div id="ct2" style="height:260px"></div></div>`:''}
+    <div class="footer">数据仅在本机处理，不上传任何服务器 · 历史数据保存于浏览器本地存储</div>
+  `;
+
+  // revenue bar
+  const rbi=rv.barItems.filter(r=>r.mb>0||r.ma>0);
+  EC.r=echarts.init(document.getElementById('cr'));
+  EC.r.setOption({tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},legend:{data:['预算','实际'],bottom:0,textStyle:{fontSize:11}},grid:{top:10,bottom:40,left:10,right:16,containLabel:true},
+    xAxis:{type:'value',axisLabel:{fontSize:10},splitLine:{lineStyle:{type:'dashed',color:'#E8EEF5'}}},
+    yAxis:{type:'category',data:rbi.map(r=>r.name),axisLabel:{fontSize:11}},
+    series:[
+      {name:'预算',type:'bar',data:rbi.map(r=>r.mb),itemStyle:{color:'#D0DBE8',borderRadius:[0,4,4,0]},barMaxWidth:18},
+      {name:'实际',type:'bar',data:rbi.map(r=>({value:r.ma,itemStyle:{color:r.ma>=r.mb?'#0D9E82':'#E06B20',borderRadius:[0,4,4,0]}})),barMaxWidth:18},
+    ]});
+
+  // margin trend
+  const td=keys.map(m=>{const d=ST.months[m];const r=d.revenue.recog.ma,g=d.revenue.gp.ma;return{month:m,rev:r,mg:r?(g/r*100).toFixed(2):0};});
+  EC.m=echarts.init(document.getElementById('cm'));
+  EC.m.setOption({tooltip:{trigger:'axis'},legend:{data:['结转收入','毛利率%'],bottom:0,textStyle:{fontSize:11}},grid:{top:10,bottom:40,left:60,right:60},
+    xAxis:{type:'category',data:td.map(d=>d.month),axisLabel:{fontSize:10,rotate:td.length>4?30:0}},
+    yAxis:[{type:'value',name:'万元',nameTextStyle:{fontSize:10},axisLabel:{fontSize:10},splitLine:{lineStyle:{type:'dashed',color:'#E8EEF5'}}},
+           {type:'value',name:'%',nameTextStyle:{fontSize:10},axisLabel:{fontSize:10,formatter:v=>v+'%'},min:0,max:60,splitLine:{show:false}}],
+    series:[
+      {name:'结转收入',type:'bar',data:td.map(d=>d.rev),itemStyle:{color:'#BDDAF5',borderRadius:[4,4,0,0]},barMaxWidth:36,yAxisIndex:0},
+      {name:'毛利率%',type:'line',data:td.map(d=>d.mg),yAxisIndex:1,smooth:true,lineStyle:{color:'#0D9E82',width:2.5},symbol:'circle',symbolSize:7,itemStyle:{color:'#0D9E82'},label:{show:td.length<=8,formatter:p=>p.value+'%',fontSize:10,position:'top'}},
+    ]});
+
+  // expense bar
+  EC.e=echarts.init(document.getElementById('ce'));
+  EC.e.setOption({tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},legend:{data:['预算','实际'],bottom:0,textStyle:{fontSize:11}},grid:{top:10,bottom:40,left:10,right:16,containLabel:true},
+    xAxis:{type:'value',axisLabel:{fontSize:10},splitLine:{lineStyle:{type:'dashed',color:'#E8EEF5'}}},
+    yAxis:{type:'category',data:ex.items.map(r=>r.name),axisLabel:{fontSize:10}},
+    series:[
+      {name:'预算',type:'bar',data:ex.items.map(r=>r.mb),itemStyle:{color:'#D0DBE8',borderRadius:[0,4,4,0]},barMaxWidth:16},
+      {name:'实际',type:'bar',data:ex.items.map(r=>({value:r.ma,itemStyle:{color:r.ma<=r.mb?'#1A8050':'#C93B3B',borderRadius:[0,4,4,0]}})),barMaxWidth:16},
+    ]});
+
+  // cashflow bar
+  const cfi=cf.items.filter(r=>r.mp>0||r.ma>0);
+  EC.c=echarts.init(document.getElementById('cc2'));
+  EC.c.setOption({tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},legend:{data:['计划','实际'],bottom:0,textStyle:{fontSize:11}},grid:{top:10,bottom:50,left:16,right:16,containLabel:true},
+    xAxis:{type:'category',data:cfi.map(r=>r.name),axisLabel:{fontSize:10,rotate:15}},
+    yAxis:{type:'value',axisLabel:{fontSize:10},splitLine:{lineStyle:{type:'dashed',color:'#E8EEF5'}}},
+    series:[
+      {name:'计划',type:'bar',data:cfi.map(r=>r.mp),itemStyle:{color:'#D0DBE8',borderRadius:[4,4,0,0]},barMaxWidth:24},
+      {name:'实际',type:'bar',data:cfi.map(r=>({value:r.ma,itemStyle:{color:r.name.includes('支付')||r.name.includes('支出')||r.name.includes('还款')?'#E06B20':'#1456A8',borderRadius:[4,4,0,0]}})),barMaxWidth:24},
+    ]});
+
+  // YTD table
+  const ytdRows=[
+    {name:'结转收入',yb:rv.recog.yb,ya:rv.recog.ya,ann:rv.recog.ann,bold:true},
+    {name:'结转成本',yb:rv.cost.yb, ya:rv.cost.ya, ann:rv.cost.ann},
+    {name:'毛利润',  yb:rv.gp.yb,  ya:rv.gp.ya,  ann:rv.gp.ann,  bold:true},
+    ...ex.items.slice(0,5).map(r=>({name:r.name,yb:r.yb,ya:r.ya,ann:0})),
+  ];
+  document.getElementById('ytd').innerHTML=
+    `<thead><tr>${['科目','YTD预算','YTD实际','完成率','全年预算','全年进度'].map((h,i)=>`<th style="${i===0?'text-align:left':''}">${h}</th>`).join('')}</tr></thead>`+
+    `<tbody>${ytdRows.map(r=>{
+      const cp=r.yb?(r.ya/r.yb*100):null;
+      const an=r.ann?(r.ya/r.ann*100):null;
+      return`<tr class="${r.bold?'tot':''}"><td>${r.name}</td><td class="mn">${F(r.yb)}</td><td class="mn">${F(r.ya)}</td>
+        <td><span class="${cp==null?'':cp>=95?'gr':cp>=80?'':'rd'}">${cp!=null?cp.toFixed(1)+'%':'—'}</span></td>
+        <td class="mn">${r.ann?F(r.ann):'—'}</td>
+        <td>${an!=null?`<div class="pw"><div class="pt"><div class="pf" style="width:${Math.min(an,100)}%;background:${an>=50?'var(--teal)':'var(--orange)'}"></div></div><span style="font-size:10px;color:var(--muted)">${an.toFixed(0)}%</span></div>`:'—'}</td>
+      </tr>`;}).join('')}</tbody>`;
+
+  // YoY
+  const pyRev=rv.yoy.prevYear||0, pmRev=rv.yoy.prevMonth||prevRevMA;
+  const yp=pyRev?D(curRevMA,pyRev):null, mp2=pmRev?D(curRevMA,pmRev):null;
+  document.getElementById('yg').innerHTML=[
+    {l:'本月结转收入', v:F(curRevMA)+' 万', s:'', c:''},
+    {l:'本月毛利率',   v:(margin??'—')+'%', s:`预算：${P(rv.gp.mb,rv.recog.mb)}`, c:''},
+    {l:'同比增长', v:yp!=null?(parseFloat(yp)>=0?'▲':'▼')+Math.abs(yp)+'%':'—', s:`上年同期：${F(pyRev)} 万`, c:yp==null?'var(--muted)':parseFloat(yp)>=0?'var(--green)':'var(--red)'},
+    {l:'环比增长', v:mp2!=null?(parseFloat(mp2)>=0?'▲':'▼')+Math.abs(mp2)+'%':'—', s:`上月：${F(pmRev)} 万`, c:mp2==null?'var(--muted)':parseFloat(mp2)>=0?'var(--green)':'var(--red)'},
+  ].map(i=>`<div class="yi"><div class="yl">${i.l}</div><div class="yv" style="${i.c?'color:'+i.c:''}">${i.v}</div><div class="yc">${i.s}</div></div>`).join('');
+
+  // multi-month trend
+  if(keys.length>1){
+    EC.t=echarts.init(document.getElementById('ct2'));
+    EC.t.setOption({tooltip:{trigger:'axis'},legend:{data:['结转收入','结转成本','毛利润'],bottom:0,textStyle:{fontSize:11}},grid:{top:20,bottom:50,left:60,right:20},
+      xAxis:{type:'category',data:keys,axisLabel:{fontSize:11}},
+      yAxis:{type:'value',name:'万元',axisLabel:{fontSize:10},splitLine:{lineStyle:{type:'dashed',color:'#E8EEF5'}}},
+      series:[
+        {name:'结转收入',type:'bar',data:keys.map(m=>ST.months[m].revenue.recog.ma),itemStyle:{color:'#BDDAF5',borderRadius:[4,4,0,0]},barMaxWidth:40},
+        {name:'结转成本',type:'bar',data:keys.map(m=>ST.months[m].revenue.cost.ma), itemStyle:{color:'#FFD9B5',borderRadius:[4,4,0,0]},barMaxWidth:40},
+        {name:'毛利润', type:'line',data:keys.map(m=>ST.months[m].revenue.gp.ma),smooth:true,lineStyle:{color:'#0D9E82',width:2.5},symbol:'circle',symbolSize:7,itemStyle:{color:'#0D9E82'},label:{show:true,fontSize:10,position:'top'}},
+      ]});
+  }
+
+  window.addEventListener('resize',()=>Object.values(EC).forEach(c=>{try{c.resize();}catch(e){}}));
+}
+
+// drag & drop
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)go(f);});
+
+// init
+loadST();
+if(Object.keys(ST.months).length>0){ST.cur=ST.cur||Object.keys(ST.months).sort().pop();renderAll();}
+</script>
+</body>
+</html>
